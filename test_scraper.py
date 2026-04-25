@@ -1,9 +1,12 @@
-"""Quick test of the fixed Agmarknet scraper — writes output to file."""
+"""Quick test of the Agmarknet scraper for vegetable data."""
+
+import os
 import logging
 import sys
 
-# Write output to file
-outfile = open(r"d:\CommodityPP\test_output.txt", "w", encoding="utf-8")
+# Write output to file in the project directory
+output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_output.txt")
+outfile = open(output_path, "w", encoding="utf-8")
 sys.stdout = outfile
 sys.stderr = outfile
 
@@ -17,13 +20,13 @@ s = AgmarknetScraper()
 filters = s.get_filters()
 print("Filter keys:", list(filters.keys()))
 
-# Test 2: ID resolution
-cid = s._resolve_id("commodity", "Wheat", filters)
-sid = s._resolve_id("state", "Madhya Pradesh", filters)
-print(f"Wheat ID: {cid}, Madhya Pradesh ID: {sid}")
+# Test 2: ID resolution for a vegetable
+cid = s._resolve_id("commodity", "Tomato", filters)
+sid = s._resolve_id("state", "Maharashtra", filters)
+print(f"Tomato ID: {cid}, Maharashtra ID: {sid}")
 
-# Test 3: Fetch data
-df = s.fetch_data("Wheat", "Madhya Pradesh", from_date="2026-03-01", to_date="2026-03-11")
+# Test 3: Fetch vegetable data
+df = s.fetch_data("Tomato", "Maharashtra", from_date="2026-03-01", to_date="2026-03-11")
 print(f"\nRESULT: {len(df)} rows fetched")
 print(f"Columns: {df.columns.tolist()}")
 if not df.empty:

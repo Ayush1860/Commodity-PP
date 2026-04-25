@@ -187,32 +187,34 @@ class AgmarknetScraper:
             f"range={from_date} to {to_date}"
         )
 
-        # ── Paginated Fetch ──────────────────────────────────────────────
+        # ── Paginated Fetch (POST with JSON body) ────────────────────────
         all_records = []
         page = 1
 
         while True:
-            params = {
+            # Agmarknet 2.0 API requires POST with JSON body
+            request_body = {
                 "from_date": from_date,
                 "to_date": to_date,
                 "data_type": config.DEFAULT_DATA_TYPE,
                 "commodity": commodity_id,
-                "state": f"[{state_id}]",
-                "district": f"[{config.DEFAULT_DISTRICT_ID}]",
-                "market": f"[{config.DEFAULT_MARKET_ID}]",
-                "grade": f"[{config.DEFAULT_GRADE_ID}]",
-                "variety": f"[{config.DEFAULT_VARIETY_ID}]",
+                "state": [state_id],
+                "district": [config.DEFAULT_DISTRICT_ID],
+                "market": [config.DEFAULT_MARKET_ID],
+                "grade": [config.DEFAULT_GRADE_ID],
+                "variety": [config.DEFAULT_VARIETY_ID],
                 "limit": config.PAGE_SIZE,
                 "page": page,
             }
             if group_id is not None:
-                params["group"] = group_id
+                request_body["group"] = group_id
 
+            payload = None
             for attempt in range(1, config.MAX_RETRIES + 1):
                 try:
-                    resp = self.session.get(
+                    resp = self.session.post(
                         config.REPORT_ENDPOINT,
-                        params=params,
+                        json=request_body,
                         timeout=config.REQUEST_TIMEOUT,
                     )
                     # 404 means no more pages — treat as end of data
@@ -235,30 +237,44 @@ class AgmarknetScraper:
                             f"{config.MAX_RETRIES} retries."
                         )
 
-            # If we got a 404, stop pagination
+            # If we got a 404 or no response, stop pagination
             if payload is None:
                 break
 
             # ── Parse Response ───────────────────────────────────────────
-            # API returns: {"status": true, "data": {"data": [...records...], "pagination": [{"total_count": N, ...}]}}
+            # Actual API structure:
+            # {"status": true, "data": {
+            #     "columns": [...],
+            #     "records": [{
+            #         "data": [...actual records...],
+            #         "pagination": [{"total_count": N, "total_pages": M, ...}]
+            #     }]
+            # }}
             data_body = payload.get("data", payload)
+            records = []
+            total = None
+
             if isinstance(data_body, dict):
-                # Records are in data_body["data"], NOT data_body["records"]
-                records = data_body.get("data", data_body.get("records", data_body.get("results", [])))
-                # Pagination info is in data_body["pagination"][0]
-                pagination = data_body.get("pagination", [])
-                if isinstance(pagination, list) and pagination:
-                    total = pagination[0].get("total_count")
-                elif isinstance(pagination, dict):
-                    total = pagination.get("total_count", pagination.get("total"))
+                records_wrapper = data_body.get("records", [])
+                if isinstance(records_wrapper, list) and records_wrapper:
+                    # Records are nested inside records[0].data
+                    first_block = records_wrapper[0]
+                    if isinstance(first_block, dict):
+                        records = first_block.get("data", [])
+                        # Pagination is inside records[0].pagination[0]
+                        pagination = first_block.get("pagination", [])
+                        if isinstance(pagination, list) and pagination:
+                            total = pagination[0].get("total_count")
+                    else:
+                        records = records_wrapper
                 else:
-                    total = None
+                    # Fallback: try data.data directly
+                    records = data_body.get("data", [])
+                    pagination = data_body.get("pagination", [])
+                    if isinstance(pagination, list) and pagination:
+                        total = pagination[0].get("total_count")
             elif isinstance(data_body, list):
                 records = data_body
-                total = None
-            else:
-                records = []
-                total = None
 
             if not records:
                 logger.info(f"No more records on page {page}. Fetch complete.")
@@ -266,7 +282,8 @@ class AgmarknetScraper:
 
             all_records.extend(records)
             logger.info(f"Page {page}: fetched {len(records)} records "
-                        f"(total: {len(all_records)})")
+                        f"(total so far: {len(all_records)}"
+                        f"{f', API total: {total}' if total else ''})")
 
             # Check for pagination end
             if total is not None and len(all_records) >= total:
@@ -301,10 +318,10 @@ class AgmarknetScraper:
                       "reported_date"],
             "Market": ["market_name", "market", "apmc_market", "mandi",
                         "market_center"],
-            "Commodity": ["commodity_name", "commodity"],
+            "Commodity": ["cmdt_name", "commodity_name", "commodity"],
             "Variety": ["variety_name", "variety", "grade", "variety_grade"],
-            "Arrivals_Tonnes": ["arrivals", "arrivals_tonnes", "arrival",
-                                 "quantity", "arrival_qty", "arrivals_(tonnes)"],
+            "Arrivals_Tonnes": ["arrival_qty", "arrivals", "arrivals_tonnes",
+                                 "arrival", "quantity", "arrivals_(tonnes)"],
             "Min_Price": ["min_price", "minimum_price", "min"],
             "Max_Price": ["max_price", "maximum_price", "max"],
             "Modal_Price": ["model_price", "modal_price", "modal"],
@@ -325,9 +342,15 @@ class AgmarknetScraper:
             df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=True)
 
         # Convert price and quantity columns to numeric
+        # API returns comma-formatted strings like "3,000.00" — strip commas first
         for col in ["Min_Price", "Max_Price", "Modal_Price", "Arrivals_Tonnes"]:
             if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce")
+                df[col] = (
+                    df[col]
+                    .astype(str)
+                    .str.replace(",", "", regex=False)
+                    .pipe(pd.to_numeric, errors="coerce")
+                )
 
         # Sort by date
         if "Date" in df.columns:

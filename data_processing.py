@@ -118,6 +118,21 @@ def fill_non_trading_days(
     groups = df.groupby(market_col) if market_col in df.columns else [(None, df)]
 
     for market_name, group in groups:
+        # Aggregate duplicates per date (e.g. multiple varieties at same market)
+        # before reindexing, otherwise pandas raises "duplicate labels" error
+        agg_dict = {}
+        for col in ["Min_Price", "Max_Price", "Modal_Price"]:
+            if col in group.columns:
+                agg_dict[col] = "mean"
+        if "Arrivals_Tonnes" in group.columns:
+            agg_dict["Arrivals_Tonnes"] = "sum"
+        for col in ["Market", "Commodity", "Variety", "State", "District"]:
+            if col in group.columns:
+                agg_dict[col] = "first"
+
+        if agg_dict:
+            group = group.groupby("Date").agg(agg_dict).reset_index()
+
         date_range = pd.date_range(
             start=group["Date"].min(),
             end=group["Date"].max(),

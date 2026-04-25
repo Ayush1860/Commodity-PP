@@ -222,14 +222,31 @@ def engineer_features(
     Run the full feature engineering pipeline.
 
     Steps:
-    1. Temporal features (year, month, day, cyclical encodings)
-    2. Lag features (configurable periods)
-    3. Rolling window features (mean, std, min, max)
-    4. Price change features (momentum, spread)
-    5. Target column (future price at t+horizon)
-    6. Drop rows with NaN
+    1. Auto-adapt lags/windows to dataset size
+    2. Temporal features (year, month, day, cyclical encodings)
+    3. Lag features (configurable periods)
+    4. Rolling window features (mean, std, min, max)
+    5. Price change features (momentum, spread)
+    6. Target column (future price at t+horizon)
+    7. Drop rows with NaN
     """
     logger.info(f"Starting feature engineering. Input shape: {df.shape}")
+
+    n_rows = len(df)
+
+    # Auto-adapt lags and windows for small datasets to avoid losing all rows
+    # We need at least ~20 rows left after NaN drops for meaningful training
+    if lags is None:
+        lags = [l for l in config.LAG_PERIODS if l < n_rows * 0.6]
+        if not lags:
+            lags = [1]  # always keep at least lag-1
+        logger.info(f"Auto-adapted lags for {n_rows} rows: {lags}")
+
+    if windows is None:
+        windows = [w for w in config.ROLLING_WINDOWS if w <= n_rows * 0.6]
+        if not windows:
+            windows = [min(7, max(2, n_rows // 3))]
+        logger.info(f"Auto-adapted windows for {n_rows} rows: {windows}")
 
     df = add_temporal_features(df)
     df = add_lag_features(df, target_col=target_col, lags=lags)

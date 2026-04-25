@@ -1,5 +1,7 @@
 """
 config.py — Central configuration for the Commodity Price Prediction Engine.
+
+Focused on vegetable price prediction in the Indian market.
 """
 
 import os
@@ -54,6 +56,70 @@ DEFAULT_DISTRICT_ID = 100001   # "All Districts"
 DEFAULT_MARKET_ID = 100002     # "All Markets"
 DEFAULT_GRADE_ID = 100003      # "All Grades"
 DEFAULT_VARIETY_ID = 100007    # "All Varieties"
+
+# ─────────────────────────── Vegetable Presets ───────────────────────────
+# Curated list of commonly traded vegetables in Indian wholesale markets.
+# These are the vegetables available on Agmarknet with high data availability.
+VEGETABLES = [
+    "Tomato",
+    "Onion",
+    "Potato",
+    "Green Chilli",
+    "Cabbage",
+    "Cauliflower",
+    "Brinjal",
+    "Lady Finger(Bhindi)",
+    "Capsicum",
+    "Bottle Gourd",
+    "Bitter Gourd",
+    "Cucumber",
+    "Pumpkin",
+    "Radish",
+    "Carrot",
+    "Beans",
+    "Peas",
+    "Spinach",
+    "Methi(Fenugreek Leaves)",
+    "Coriander(Leaves)",
+    "Ginger(Green)",
+    "Garlic",
+    "Drumstick",
+    "Ridge Gourd(Tori)",
+    "Pointed Gourd(Parval)",
+    "Cluster Beans",
+    "Ash Gourd",
+    "Snake Gourd",
+    "Round Gourd",
+    "Papaya(Raw)",
+]
+
+# Default commodity for the dashboard — a highly volatile vegetable
+DEFAULT_COMMODITY = "Tomato"
+DEFAULT_COMMODITY_GROUP = "Vegetables"
+
+# Major agricultural states with high mandi data availability
+VEGETABLE_STATES = [
+    "Maharashtra",
+    "Karnataka",
+    "Madhya Pradesh",
+    "Uttar Pradesh",
+    "Gujarat",
+    "Rajasthan",
+    "Tamil Nadu",
+    "Andhra Pradesh",
+    "Telangana",
+    "West Bengal",
+    "Punjab",
+    "Haryana",
+    "Bihar",
+    "Odisha",
+    "Chhattisgarh",
+    "Jharkhand",
+    "Kerala",
+    "Himachal Pradesh",
+    "Assam",
+]
+DEFAULT_STATE = "Maharashtra"
 
 # ─────────────────────────── Data Storage ────────────────────────────────
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")

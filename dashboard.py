@@ -1,6 +1,7 @@
 """
-dashboard.py — Streamlit Dashboard for Commodity Price Visualization.
+dashboard.py — Streamlit Dashboard for Vegetable Price Prediction.
 
+Focused on Indian market vegetable price forecasting.
 Run with: streamlit run dashboard.py
 """
 
@@ -32,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 # ─────────────────────────── Page Config ─────────────────────────────────
 st.set_page_config(
-    page_title="Commodity Price Predictor",
-    page_icon="🌾",
+    page_title="🥬 Veggie Price Predictor — Indian Market",
+    page_icon="🥬",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -66,7 +67,7 @@ st.markdown("""
         text-align: center;
         font-size: 2.2rem;
         font-weight: 700;
-        background: linear-gradient(90deg, #00b09b, #96c93d);
+        background: linear-gradient(90deg, #43e97b, #38f9d7);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 0;
@@ -77,13 +78,25 @@ st.markdown("""
         color: #888;
         margin-top: 0;
     }
+
+    /* Vegetable emoji badges */
+    .veggie-badge {
+        display: inline-block;
+        background: rgba(67, 233, 123, 0.1);
+        border: 1px solid rgba(67, 233, 123, 0.3);
+        border-radius: 20px;
+        padding: 4px 12px;
+        margin: 2px;
+        font-size: 0.85rem;
+        color: #43e97b;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────── Header ──────────────────────────────────────
-st.markdown('<h1 class="header-title">🌾 Commodity Price Prediction Engine</h1>',
+st.markdown('<h1 class="header-title">🥬 Vegetable Price Predictor</h1>',
             unsafe_allow_html=True)
-st.markdown('<p class="header-subtitle">Powered by XGBoost & Agmarknet Data</p>',
+st.markdown('<p class="header-subtitle">AI-Powered Price Forecasting for Indian Vegetable Markets • Powered by XGBoost & Agmarknet</p>',
             unsafe_allow_html=True)
 st.markdown("---")
 
@@ -91,17 +104,31 @@ st.markdown("---")
 with st.sidebar:
     st.header("⚙️ Configuration")
 
-    # Commodity input
-    commodity = st.text_input(
-        "Commodity Name",
-        value="Wheat",
-        help="e.g., Wheat, Tomato, Onion, Rice, Potato"
-    )
+    # Vegetable selection — dropdown with curated list + custom option
+    st.subheader("🥦 Select Vegetable")
+    use_custom = st.checkbox("Enter custom commodity name", value=False)
 
-    state = st.text_input(
+    if use_custom:
+        commodity = st.text_input(
+            "Commodity Name",
+            value=config.DEFAULT_COMMODITY,
+            help="Enter any commodity name available on Agmarknet",
+        )
+    else:
+        commodity = st.selectbox(
+            "Vegetable",
+            options=config.VEGETABLES,
+            index=config.VEGETABLES.index(config.DEFAULT_COMMODITY),
+            help="Select from commonly traded Indian vegetables",
+        )
+
+    # State selection — dropdown with curated list
+    st.subheader("📍 Select State")
+    state = st.selectbox(
         "State",
-        value="Madhya Pradesh",
-        help="e.g., Madhya Pradesh, Karnataka, Maharashtra"
+        options=config.VEGETABLE_STATES,
+        index=config.VEGETABLE_STATES.index(config.DEFAULT_STATE),
+        help="Major agricultural states with good mandi data availability",
     )
 
     st.markdown("---")
@@ -109,8 +136,9 @@ with st.sidebar:
     # Date range
     st.subheader("📅 Date Range")
     days_back = st.slider(
-        "Historical Days", min_value=30, max_value=730,
-        value=365, step=30
+        "Historical Days", min_value=90, max_value=730,
+        value=365, step=30,
+        help="Minimum 90 days recommended for reliable predictions"
     )
 
     st.markdown("---")
@@ -202,21 +230,39 @@ if run_button:
         # Data Cleaning
         st.write("🧹 **Step 2/5**: Cleaning data...")
         clean_df = clean_pipeline(raw_df)
+        if clean_df.empty or len(clean_df) < 5:
+            st.error(
+                f"After cleaning, only {len(clean_df)} valid rows remain. "
+                f"Try increasing the date range or choosing a different state/commodity "
+                f"with more market data."
+            )
+            st.stop()
         st.write(f"  ✓ Cleaned: {clean_df.shape[0]} rows, {clean_df.shape[1]} columns.")
 
         # Feature Engineering
         st.write("⚙️ **Step 3/5**: Engineering features...")
         feature_df = engineer_features(clean_df, forecast_horizon=1)
         feature_cols = get_feature_columns(feature_df)
-        st.write(f"  ✓ Created {len(feature_cols)} features.")
+        if feature_df.empty or len(feature_df) < 10:
+            st.error(
+                f"Not enough data after feature engineering ({len(feature_df)} rows). "
+                f"Need at least 10 rows for model training. "
+                f"Please increase the date range to 180+ days."
+            )
+            st.stop()
+        st.write(f"  ✓ Created {len(feature_cols)} features, {len(feature_df)} training rows.")
 
         # Model Training
         st.write(f"🤖 **Step 4/5**: Training XGBoost model...")
-        model, metrics, importance = train_model(
-            feature_df,
-            tune=tune_model,
-            n_trials=n_trials if tune_model else None,
-        )
+        try:
+            model, metrics, importance = train_model(
+                feature_df,
+                tune=tune_model,
+                n_trials=n_trials if tune_model else None,
+            )
+        except ValueError as e:
+            st.error(f"Model training failed: {e}")
+            st.stop()
         st.write(f"  ✓ Model trained. Test RMSE: ₹{metrics['test_rmse']:.2f}")
 
         # Forecasting
@@ -298,7 +344,7 @@ if "forecast_df" in st.session_state:
             y=clean_df["Modal_Price"],
             mode="lines",
             name="Modal Price (Historical)",
-            line=dict(color="#00b09b", width=2),
+            line=dict(color="#43e97b", width=2),
             hovertemplate="Date: %{x}<br>Price: ₹%{y:.2f}<extra></extra>",
         ))
 
@@ -309,7 +355,7 @@ if "forecast_df" in st.session_state:
             y=clean_df["Max_Price"],
             mode="lines",
             name="Max Price",
-            line=dict(color="rgba(150,201,61,0.3)", width=0),
+            line=dict(color="rgba(56,249,215,0.3)", width=0),
             showlegend=False,
             hoverinfo="skip",
         ))
@@ -318,9 +364,9 @@ if "forecast_df" in st.session_state:
             y=clean_df["Min_Price"],
             mode="lines",
             name="Price Range (Min-Max)",
-            line=dict(color="rgba(150,201,61,0.3)", width=0),
+            line=dict(color="rgba(56,249,215,0.3)", width=0),
             fill="tonexty",
-            fillcolor="rgba(150,201,61,0.1)",
+            fillcolor="rgba(56,249,215,0.08)",
             hoverinfo="skip",
         ))
 
@@ -383,6 +429,21 @@ if "forecast_df" in st.session_state:
             hide_index=True,
         )
 
+        # Quick summary
+        pred_prices = forecast_df["Predicted_Price"]
+        avg_pred = pred_prices.mean()
+        trend = "📈 Rising" if pred_prices.iloc[-1] > pred_prices.iloc[0] else "📉 Falling"
+        last_actual = clean_df["Modal_Price"].iloc[-1] if "Modal_Price" in clean_df.columns else 0
+        pct_change = ((avg_pred - last_actual) / last_actual * 100) if last_actual > 0 else 0
+
+        st.markdown(f"""
+        **Quick Summary:**
+        - **Trend:** {trend}
+        - **Avg Predicted:** ₹{avg_pred:.2f}/quintal
+        - **Last Actual:** ₹{last_actual:.2f}/quintal
+        - **Expected Change:** {pct_change:+.1f}%
+        """)
+
     with col_right:
         st.markdown("### 🏆 Feature Importance (Top 15)")
         top_n = importance.head(15).sort_values("Importance")
@@ -411,7 +472,7 @@ if "forecast_df" in st.session_state:
             x=clean_df["Date"],
             y=clean_df["Arrivals_Tonnes"],
             name="Arrivals (Tonnes)",
-            marker_color="rgba(150,201,61,0.6)",
+            marker_color="rgba(67,233,123,0.5)",
             hovertemplate="Date: %{x}<br>Arrivals: %{y:.0f} T<extra></extra>",
         ))
         fig_arr.update_layout(
@@ -430,18 +491,20 @@ if "forecast_df" in st.session_state:
 else:
     # No results yet — show instructions
     st.markdown("""
-    <div style="text-align:center; padding: 80px 20px; color: #666;">
-        <h2 style="font-size: 3rem; margin-bottom: 10px;">🌾</h2>
-        <h3>Welcome to the Commodity Price Prediction Engine</h3>
-        <p style="font-size: 1.1rem; max-width: 600px; margin: auto;">
-            Configure your commodity, state, and model settings in the sidebar,
-            then click <b>🚀 Run Pipeline</b> to scrape data, train the model,
-            and generate a price forecast.
+    <div style="text-align:center; padding: 60px 20px; color: #666;">
+        <h2 style="font-size: 4rem; margin-bottom: 10px;">🥬🍅🥔🧅🌶️</h2>
+        <h3>Welcome to the Vegetable Price Predictor</h3>
+        <p style="font-size: 1.1rem; max-width: 700px; margin: 20px auto;">
+            Predict future wholesale prices of Indian vegetables using machine learning.
+            Select a vegetable & state from the sidebar, then click <b>🚀 Run Pipeline</b>
+            to scrape live Agmarknet data, train an XGBoost model, and generate a price forecast.
         </p>
         <br>
-        <p style="font-size: 0.9rem; color: #888;">
-            Supported commodities: Wheat, Rice, Tomato, Onion, Potato, Soybean, etc.<br>
-            Data source: <a href="https://agmarknet.gov.in" target="_blank">Agmarknet</a> (Govt. of India)
+        <p style="font-size: 0.95rem; color: #999;">
+            <b>Supported vegetables:</b> Tomato, Onion, Potato, Cabbage, Cauliflower, Brinjal,
+            Lady Finger, Capsicum, Green Chilli, Bottle Gourd, Bitter Gourd, Beans, Peas, and 15+ more.<br><br>
+            <b>Data source:</b> <a href="https://agmarknet.gov.in" target="_blank">Agmarknet</a> —
+            Directorate of Marketing & Inspection, Ministry of Agriculture, Govt. of India
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -451,7 +514,7 @@ else:
 st.markdown("---")
 st.markdown(
     '<p style="text-align:center; color:#555; font-size:0.8rem;">'
-    'Commodity Price Prediction Engine • Powered by XGBoost & Agmarknet 2.0 API'
+    'Vegetable Price Prediction Engine • Powered by XGBoost & Agmarknet 2.0 API • Indian Market Focus'
     '</p>',
     unsafe_allow_html=True,
 )

@@ -2,6 +2,7 @@
 main.py — Pipeline Orchestrator (CLI Entry Point).
 
 Runs the complete pipeline: Scrape → Clean → Feature Engineer → Train → Forecast.
+Focused on Indian vegetable market price prediction.
 """
 
 import os
@@ -69,9 +70,9 @@ def run_pipeline(
         to_date = datetime.now().strftime("%Y-%m-%d")
 
     print(f"\n{'='*60}")
-    print(f"  COMMODITY PRICE PREDICTION ENGINE")
+    print(f"  🥬 VEGETABLE PRICE PREDICTION ENGINE")
     print(f"{'='*60}")
-    print(f"  Commodity  : {commodity}")
+    print(f"  Vegetable  : {commodity}")
     print(f"  State      : {state}")
     print(f"  Date Range : {from_date} → {to_date}")
     print(f"  Forecast   : {forecast_days} days ahead")
@@ -197,24 +198,25 @@ def run_pipeline(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Commodity Price Prediction Engine",
+        description="Vegetable Price Prediction Engine — Indian Market",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py --commodity Wheat --state "Madhya Pradesh"
-  python main.py --commodity Tomato --state Karnataka --days 180 --no-tune
-  python main.py --commodity Rice --state "West Bengal" --csv data/rice.csv --skip-scrape
+  python main.py --commodity Tomato --state Maharashtra
+  python main.py --commodity Onion --state Karnataka --days 180 --no-tune
+  python main.py --commodity Potato --state "Uttar Pradesh" --csv data/potato.csv --skip-scrape
+  python main.py --commodity "Green Chilli" --state "Madhya Pradesh" --forecast 14
         """,
     )
 
     # Required
     parser.add_argument(
         "--commodity", required=True,
-        help="Commodity name (e.g., Wheat, Tomato, Onion)"
+        help="Vegetable name (e.g., Tomato, Onion, Potato, Cabbage, Brinjal)"
     )
     parser.add_argument(
         "--state", required=True,
-        help="State name (e.g., 'Madhya Pradesh', Karnataka)"
+        help="State name (e.g., Maharashtra, Karnataka, 'Uttar Pradesh')"
     )
 
     # Date range

@@ -163,17 +163,24 @@ def train_model(
     X = df[feature_cols].copy()
     y = df[target_col].copy()
 
+    if len(X) < 10:
+        raise ValueError(
+            f"Not enough data for training: only {len(X)} rows after feature "
+            f"engineering. Need at least 10 rows. Try increasing the date range "
+            f"to fetch more historical data (recommended: 90+ days)."
+        )
+
     logger.info(f"Training data shape: X={X.shape}, y={y.shape}")
     logger.info(f"Features ({len(feature_cols)}): {feature_cols}")
 
     # ── Train/Test Split (last 20% as hold-out) ─────────────────────────
-    split_idx = int(len(X) * 0.8)
+    split_idx = max(1, int(len(X) * 0.8))
     X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
     y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
 
     logger.info(
         f"Split: train={len(X_train)}, test={len(X_test)} "
-        f"(test from {df['Date'].iloc[split_idx] if 'Date' in df.columns else split_idx})"
+        f"(test from {df['Date'].iloc[split_idx] if 'Date' in df.columns and split_idx < len(df) else split_idx})"
     )
 
     # ── Hyperparameter Tuning ────────────────────────────────────────────
